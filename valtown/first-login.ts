@@ -94,7 +94,7 @@ function renderStartPage(): Response {
   return pageTemplate(
     "Claw First Login",
     `<div class="card">
-  <p>Click start to run first login. If GitHub asks for 2FA or verified-device email code, this page will ask you to input the code.</p>
+  <p>Click start to run first login. If GitHub asks for a manual verification code (for example verified-device email code), this page will ask you to input it.</p>
   <p><a href="?run=1"><button>Start first login</button></a></p>
 </div>`,
   );
@@ -131,7 +131,7 @@ function renderChallengePage(
   <form method="POST">
     <input type="hidden" name="challengeToken" value="${escapeHtml(challengeToken)}" />
     <label>Verification code</label><br />
-    <input name="verificationCode" placeholder="Enter 2FA or email code" autocomplete="one-time-code" />
+    <input name="verificationCode" placeholder="Enter verification code" autocomplete="one-time-code" />
     <br />
     <button type="submit">Submit code</button>
   </form>

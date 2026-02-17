@@ -1,4 +1,10 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+} from "crypto";
 import chromium from "@sparticuz/chromium";
 import {
   chromium as playwrightChromium,
@@ -18,8 +24,8 @@ type LoginResult = {
 type RequiredEnv = {
   githubUsername: string;
   githubPassword: string;
+  githubOtpSecret: string;
   clawSigninUrl: string;
-  githubOtp?: string;
 };
 
 type PageDebugState = {
@@ -40,6 +46,7 @@ const VERIFICATION_CHALLENGE_TTL_MS = 10 * 60 * 1000;
 const GITHUB_AUTH_URL_RE = /github\.com\/(login|session|sessions|authorize)/i;
 const GITHUB_VERIFICATION_URL_RE =
   /github\.com\/sessions\/(two-factor|verified-device)/i;
+const GITHUB_TWO_FACTOR_URL_RE = /github\.com\/sessions\/two-factor/i;
 const CLAW_URL_RE = /run\.claw\.cloud\//i;
 const CLAW_SIGNIN_PATH_RE = /\/signin(?:\/|$)/i;
 
@@ -73,8 +80,8 @@ function loadConfig(): RequiredEnv {
   return {
     githubUsername: requireEnv("GITHUB_USERNAME"),
     githubPassword: requireEnv("GITHUB_PASSWORD"),
+    githubOtpSecret: requireEnv("GITHUB_OTP_SECRET"),
     clawSigninUrl: resolveClawSigninUrl(),
-    githubOtp: process.env.GITHUB_OTP,
   };
 }
 
@@ -137,6 +144,60 @@ function fromBase64Url(value: string): Buffer {
 
 function deriveFlowKey(secret: string): Buffer {
   return createHash("sha256").update(secret, "utf8").digest();
+}
+
+function decodeBase32(base32: string): Buffer {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const normalized = base32
+    .toUpperCase()
+    .replace(/[\s-]/g, "")
+    .replace(/=+$/g, "");
+
+  if (!normalized || !/^[A-Z2-7]+$/.test(normalized)) {
+    throw new Error("GITHUB_OTP_SECRET must be a valid base32 string");
+  }
+
+  let bits = 0;
+  let value = 0;
+  const bytes: number[] = [];
+
+  for (const char of normalized) {
+    const index = alphabet.indexOf(char);
+    if (index < 0) {
+      throw new Error("GITHUB_OTP_SECRET contains invalid base32 characters");
+    }
+
+    value = (value << 5) | index;
+    bits += 5;
+
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 0xff);
+      bits -= 8;
+    }
+  }
+
+  if (bytes.length === 0) {
+    throw new Error("GITHUB_OTP_SECRET decoded to empty key");
+  }
+
+  return Buffer.from(bytes);
+}
+
+function generateGithubTotp(otpSecret: string): string {
+  const key = decodeBase32(otpSecret);
+  const timeStep = Math.floor(Date.now() / 1000 / 30);
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(timeStep));
+
+  const hmac = createHmac("sha1", key).update(counter).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  const binary =
+    ((hmac[offset] & 0x7f) << 24) |
+    ((hmac[offset + 1] & 0xff) << 16) |
+    ((hmac[offset + 2] & 0xff) << 8) |
+    (hmac[offset + 3] & 0xff);
+
+  return String(binary % 1_000_000).padStart(6, "0");
 }
 
 function encodeChallengePayload(payload: VerificationChallengePayload): string {
@@ -211,6 +272,10 @@ function isGithubAuthUrl(url: string): boolean {
 
 function isGithubVerificationUrl(url: string): boolean {
   return GITHUB_VERIFICATION_URL_RE.test(url);
+}
+
+function isGithubTwoFactorUrl(url: string): boolean {
+  return GITHUB_TWO_FACTOR_URL_RE.test(url);
 }
 
 function isLoggedInClawUrl(url: string): boolean {
@@ -458,7 +523,10 @@ async function buildLoginResult(finalPage: Page): Promise<LoginResult> {
 async function continueFromGithubPage(
   context: BrowserContext,
   githubPage: Page,
-  verificationCode?: string,
+  options?: {
+    verificationCode?: string;
+    githubOtpSecret?: string;
+  },
 ): Promise<LoginResult> {
   await githubPage
     .waitForLoadState("domcontentloaded", { timeout: 30000 })
@@ -467,6 +535,17 @@ async function continueFromGithubPage(
   const needsVerification = await isVerificationStep(githubPage);
 
   if (needsVerification) {
+    let verificationCode = options?.verificationCode;
+
+    // Auto-handle GitHub TOTP pages using GITHUB_OTP_SECRET.
+    if (
+      !verificationCode &&
+      options?.githubOtpSecret &&
+      isGithubTwoFactorUrl(githubPage.url())
+    ) {
+      verificationCode = generateGithubTotp(options.githubOtpSecret);
+    }
+
     if (!verificationCode) {
       const challenge = await createVerificationChallenge(context, githubPage);
       throw new DeviceVerificationRequiredError(challenge);
@@ -548,7 +627,9 @@ export async function loginToClawCloud(): Promise<LoginResult> {
 
   try {
     const githubPage = await performInitialGithubLogin(context, cfg);
-    return await continueFromGithubPage(context, githubPage, cfg.githubOtp);
+    return await continueFromGithubPage(context, githubPage, {
+      githubOtpSecret: cfg.githubOtpSecret,
+    });
   } catch (error) {
     if (error instanceof DeviceVerificationRequiredError) {
       throw error;
@@ -590,7 +671,9 @@ export async function submitGithubVerificationCode(
       throw new Error("Verification page is no longer available; start keepalive again");
     }
 
-    return await continueFromGithubPage(context, page, verificationCode);
+    return await continueFromGithubPage(context, page, {
+      verificationCode,
+    });
   } catch (error) {
     if (error instanceof DeviceVerificationRequiredError) {
       throw error;
