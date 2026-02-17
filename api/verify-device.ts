@@ -1,9 +1,35 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import {
   DeviceVerificationRequiredError,
-  loginToClawCloud,
+  submitGithubVerificationCode,
 } from "../lib/clawLogin";
 import { hasValidCronSecret } from "../lib/cronAuth";
+
+type VerifyRequestBody = {
+  challengeToken?: unknown;
+  verificationCode?: unknown;
+};
+
+function parseBody(req: VercelRequest): VerifyRequestBody {
+  const raw = req.body;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as VerifyRequestBody;
+    } catch {
+      return {};
+    }
+  }
+
+  if (raw && typeof raw === "object") {
+    return raw as VerifyRequestBody;
+  }
+
+  return {};
+}
+
+function readStringField(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
 
 export default async function handler(
   req: VercelRequest,
@@ -21,11 +47,27 @@ export default async function handler(
     return;
   }
 
+  const body = parseBody(req);
+  const challengeToken = readStringField(body.challengeToken);
+  const verificationCode = readStringField(body.verificationCode);
+
+  if (!challengeToken || !verificationCode) {
+    res.status(400).json({
+      ok: false,
+      error: "Missing challengeToken or verificationCode",
+    });
+    return;
+  }
+
   try {
-    const result = await loginToClawCloud();
+    const result = await submitGithubVerificationCode(
+      challengeToken,
+      verificationCode,
+    );
+
     res.status(200).json({
       ok: true,
-      message: "Claw Cloud keepalive login completed",
+      message: "Claw Cloud keepalive verification completed",
       finalUrl: result.finalUrl,
       pageTitle: result.pageTitle,
       finishedAt: result.finishedAt,
@@ -43,11 +85,11 @@ export default async function handler(
     }
 
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error(`[keepalive] ${message}`);
+    console.error(`[verify-device] ${message}`);
 
     res.status(500).json({
       ok: false,
-      error: "Keepalive login failed",
+      error: "Verification submit failed",
     });
   }
 }

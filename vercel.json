@@ -7,6 +7,10 @@
     "api/keepalive.ts": {
       "maxDuration": 60,
       "memory": 1024
+    },
+    "api/verify-device.ts": {
+      "maxDuration": 60,
+      "memory": 1024
     }
   }
 }
