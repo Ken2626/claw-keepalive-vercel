@@ -4,6 +4,16 @@ declare const Deno: {
   };
 };
 
+type KeepaliveApiPayload = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  finalUrl?: string;
+  pageTitle?: string;
+  finishedAt?: string;
+  challengeToken?: string;
+};
+
 function buildKeepaliveUrl(vercelUrl: string): string {
   const normalized = /^https?:\/\//i.test(vercelUrl)
     ? vercelUrl
@@ -16,6 +26,28 @@ function buildKeepaliveUrl(vercelUrl: string): string {
 
   parsed.pathname = parsed.pathname.replace(/\/$/, "") + "/api/keepalive";
   return parsed.toString();
+}
+
+function parseJsonMaybe(raw: string): KeepaliveApiPayload | null {
+  try {
+    return JSON.parse(raw) as KeepaliveApiPayload;
+  } catch {
+    return null;
+  }
+}
+
+function summarizeFailure(status: number, rawText: string): string {
+  const payload = parseJsonMaybe(rawText);
+  if (!payload) {
+    return `keepalive failed: ${status} ${rawText}`;
+  }
+
+  const safePayload = { ...payload };
+  if (safePayload.challengeToken) {
+    safePayload.challengeToken = "[redacted]";
+  }
+
+  return `keepalive failed: ${status} ${JSON.stringify(safePayload)}`;
 }
 
 // Note:
@@ -47,13 +79,24 @@ export default async function () {
 
   const responseText = await response.text();
   if (!response.ok) {
-    throw new Error(`keepalive failed: ${response.status} ${responseText}`);
+    const failure = summarizeFailure(response.status, responseText);
+    console.error(`[cron] ${failure}`);
+    throw new Error(failure);
   }
 
-  return {
+  const payload = parseJsonMaybe(responseText);
+  const success = {
     ok: true,
     status: response.status,
-    body: responseText,
+    message: payload?.message ?? "Keepalive completed",
+    finalUrl: payload?.finalUrl ?? "",
+    finishedAt: payload?.finishedAt ?? new Date().toISOString(),
     triggeredAt: new Date().toISOString(),
+  };
+  console.log(`[cron] success ${JSON.stringify(success)}`);
+
+  return {
+    ...success,
+    body: responseText,
   };
 }

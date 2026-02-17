@@ -11,25 +11,21 @@ A minimal open-source Vercel project that exposes a protected API endpoint to pe
 3. Vercel verifies `Authorization: Bearer <CRON_SECRET>`.
 4. Vercel runs browser automation to sign in using your configured data center URL (`CLAW_SIGNIN_URL` or `CLAW_DATACENTER`).
    - Germany example: `https://eu-central-1.run.claw.cloud/signin`
-5. `GITHUB_OTP_SECRET` is required, so GitHub `2FA` (TOTP) is auto-handled by Vercel.
-6. If GitHub still asks `verified-device` email code, use the interactive Val (`valtown/first-login.ts`) to input the code and continue.
+5. GitHub `2FA` (Authenticator) and `GITHUB_OTP_SECRET` are required, so Vercel can auto-handle TOTP codes.
 
 ## Security model (important)
 
 - Do **not** commit credentials.
 - Set `CRON_SECRET`, `GITHUB_USERNAME`, `GITHUB_PASSWORD`, `GITHUB_OTP_SECRET`, and `CLAW_DATACENTER` (or `CLAW_SIGNIN_URL`) as Vercel environment variables.
-- Optional: set `DEVICE_FLOW_SECRET` to encrypt one-time verification challenge tokens (fallback is `CRON_SECRET`).
 - In Vercel Dashboard, create them as **Sensitive Environment Variables**.
 - This repo is safe to open-source because secrets stay in Vercel/Val Town only.
 
 ## Project files
 
 - `api/keepalive.ts`: protected API endpoint.
-- `api/verify-device.ts`: continue login by submitting GitHub verification code.
 - `lib/cronAuth.ts`: constant-time bearer token check.
 - `lib/clawLogin.ts`: Playwright login flow.
 - `valtown/main.ts`: Val Town caller example.
-- `valtown/first-login.ts`: interactive first-login Val (for verified-device / manual verification code).
 
 ## Environment variables
 
@@ -41,7 +37,13 @@ Use `.env.example` as template:
 - `GITHUB_OTP_SECRET` (required; GitHub authenticator app setup key in base32, used for auto TOTP)
 - `CLAW_SIGNIN_URL` (recommended; set your own data center sign-in URL, e.g. `https://eu-central-1.run.claw.cloud/signin`)
 - `CLAW_DATACENTER` (optional alternative, e.g. `us-west-1`; code builds `https://<dc>.run.claw.cloud/signin`)
-- `DEVICE_FLOW_SECRET` (optional; encrypts one-time verification challenge token)
+
+## GitHub 2FA Setup (required)
+
+1. In GitHub, open `Settings -> Password and authentication -> Two-factor authentication`, then choose `Authenticator app`.
+2. On the QR/setup page, reveal the setup key (base32) first, copy it, and store it as `GITHUB_OTP_SECRET`.
+3. After saving the key, scan the QR code and finish GitHub verification.
+4. Add `GITHUB_OTP_SECRET` to Vercel environment variables and mark it as **Sensitive**.
 
 ## Deploy steps
 
@@ -57,18 +59,7 @@ Use `.env.example` as template:
 
 ## Val Town setup
 
-### A) First login (interactive, one-time when needed)
-
-1. Open your existing Val project (the same one where you use `main.ts` for cron).
-2. In that same Val project, create a new file `first-login.ts`, then paste `valtown/first-login.ts`.
-3. Open `first-login.ts` and add an `HTTP trigger` from the top-right menu.
-4. In Val Town env vars, set:
-   - `VERCEL_URL=https://<your-project>.vercel.app/`
-   - `CRON_SECRET=<same as Vercel>`
-5. Open the `first-login.ts` `*.web.val.run` preview URL (not the `main.ts` cron run output), then click `Start first login`.
-6. If GitHub asks `verified-device` email code, input the code on that page to finish first login.
-
-### B) Weekly keepalive cron
+Weekly keepalive cron
 
 1. In the same Val project, open `main.ts`, switch it to cron, and paste `valtown/main.ts`.
 2. In Val Town env vars, set:
