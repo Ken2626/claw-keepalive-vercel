@@ -1,6 +1,6 @@
 # claw-keepalive-vercel
 
-A minimal open-source Vercel project that exposes a protected API endpoint to perform a Claw Cloud sign-in flow via GitHub.
+An open-source keepalive solution for ClawCloud Run Free Plan users. It reduces idle resource reclamation risk by running scheduled GitHub sign-ins through a protected Vercel API (triggered by Val Town cron).
 
 中文文档: [README.zh-CN.md](./README.zh-CN.md)
 

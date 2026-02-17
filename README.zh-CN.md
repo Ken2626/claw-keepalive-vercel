@@ -1,6 +1,6 @@
 # claw-keepalive-vercel（中文说明）
 
-一个最小化的开源 Vercel 项目：提供受保护的 API，通过 GitHub 登录 Claw Cloud，用于定时保活。
+一个面向 ClawCloud Run 免费套餐用户的开源保活方案：通过 Val Town 定时触发受保护的 Vercel API，自动执行 GitHub 登录，以降低因长期空闲导致资源被回收的风险。
 
 ## 功能流程
 
