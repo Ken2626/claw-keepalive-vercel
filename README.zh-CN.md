@@ -38,10 +38,11 @@
 ## 部署步骤
 
 1. Fork 本仓库到你自己的 GitHub 账号。
-2. 在 Vercel 导入该仓库。
+2. 打开 Vercel 并登录，进入 `My Team -> Settings -> Environment Variables`。
 3. 在 Vercel 配置环境变量（按需设到 `Preview`/`Production`）。
 4. 把敏感变量标记为 **Sensitive**。
-5. 部署完成后，接口地址为：`https://<your-project>.vercel.app/api/keepalive`
+5. 在 Vercel 导入该仓库。
+6. 部署完成后，接口地址为：`https://<your-project>.vercel.app/api/keepalive`
 
 ## Val Town 配置
 

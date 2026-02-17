@@ -40,11 +40,12 @@ Use `.env.example` as template:
 ## Deploy steps
 
 1. Fork this repository to your own GitHub account.
-2. Import repository in Vercel.
+2. Open Vercel and sign in. Go to `My Team -> Settings -> Environment Variables`.
 3. Add all env vars in Vercel (`Preview` + `Production` as needed).
 4. Mark secrets as **Sensitive** in Vercel.
-5. Deploy.
-6. Your endpoint will be:
+5. Import repository in Vercel.
+6. Deploy.
+7. Your endpoint will be:
    - `https://<your-project>.vercel.app/api/keepalive`
 
 ## Val Town setup
