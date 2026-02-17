@@ -22,7 +22,7 @@
 - `api/keepalive.ts`：受保护的 API 入口。
 - `lib/cronAuth.ts`：`CRON_SECRET` 校验（常量时间比较）。
 - `lib/clawLogin.ts`：Playwright 登录流程。
-- `valtown/05_cron.ts`：Val Town 调用示例。
+- `valtown/main.ts`：Val Town 调用示例。
 
 ## 环境变量
 
@@ -46,47 +46,11 @@
 
 ## Val Town 配置
 
-1. 新建一个 Val，粘贴 `valtown/05_cron.ts`。
+1. 登录 val.town，新建一个 Val，设置为 private，打开并编辑 `main.ts`，切换为 cron，然后粘贴 `valtown/main.ts`。
 2. 在 Val Town 环境变量中设置：
-   - `VERCEL_KEEPALIVE_URL=https://<your-project>.vercel.app/api/keepalive`
+   - `VERCEL_URL=https://<your-project>.vercel.app/`
    - `CRON_SECRET=<与 Vercel 相同>`
-3. 在 Val Town 界面里设置 Cron（`05_cron.ts` 代码本身不能自动修改计划时间）。
-4. 为了避免大家都在同一时刻登录，建议为每个用户生成一个“每周随机时间”的 cron：
-
-macOS/Linux：
-
-```bash
-SEED=$(tr -dc 'a-z0-9' </dev/urandom | head -c 16)
-echo "Seed: $SEED"
-H=$(printf '%s' "$SEED" | cksum | awk '{print $1}')
-MIN=$((H % 60)); HOUR=$(((H / 60) % 24)); DOW=$(((H / 1440) % 7))
-echo "$MIN $HOUR * * $DOW"
-```
-
-Windows PowerShell：
-
-```powershell
-$seed = -join ((48..57 + 97..122) | Get-Random -Count 16 | ForEach-Object { [char]$_ })
-Write-Output "Seed: $seed"
-$sha = [Security.Cryptography.SHA256Managed]::Create()
-$hash = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($seed))
-$h = [BitConverter]::ToUInt32($hash, 0)
-$min = $h % 60
-$hour = [math]::Floor($h / 60) % 24
-$dow = [math]::Floor($h / 1440) % 7
-"$min $hour * * $dow"
-```
-
-Windows CMD（随机兜底）：
-
-```bat
-set /a min=%RANDOM% %% 60
-set /a hour=%RANDOM% %% 24
-set /a dow=%RANDOM% %% 7
-echo %min% %hour% * * %dow%
-```
-
-- 把脚本输出的 cron（UTC）粘贴到 Val Town 的 schedule 设置里。
+3. 在 Val Town 界面把 cron schedule 设置为每周运行一次。
 
 ## 本地类型检查
 

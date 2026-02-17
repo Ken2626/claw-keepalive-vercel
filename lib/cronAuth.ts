@@ -5,19 +5,20 @@ function parseBearerToken(authorizationHeader: string | undefined): string | nul
     return null;
   }
 
-  const [scheme, token] = authorizationHeader.split(" ");
-  if (scheme !== "Bearer" || !token) {
+  const match = authorizationHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match || !match[1]) {
     return null;
   }
 
-  return token;
+  return match[1].trim();
 }
 
 export function hasValidCronSecret(
   authorizationHeader: string | undefined,
   expectedSecret: string | undefined,
 ): boolean {
-  if (!expectedSecret) {
+  const normalizedExpected = expectedSecret?.trim();
+  if (!normalizedExpected) {
     return false;
   }
 
@@ -27,7 +28,7 @@ export function hasValidCronSecret(
   }
 
   const provided = Buffer.from(providedToken);
-  const expected = Buffer.from(expectedSecret);
+  const expected = Buffer.from(normalizedExpected);
 
   if (provided.length !== expected.length) {
     return false;

@@ -4,20 +4,36 @@ declare const Deno: {
   };
 };
 
+function buildKeepaliveUrl(vercelUrl: string): string {
+  const normalized = /^https?:\/\//i.test(vercelUrl)
+    ? vercelUrl
+    : `https://${vercelUrl}`;
+  const parsed = new URL(normalized);
+
+  if (parsed.pathname.endsWith("/api/keepalive")) {
+    return parsed.toString();
+  }
+
+  parsed.pathname = parsed.pathname.replace(/\/$/, "") + "/api/keepalive";
+  return parsed.toString();
+}
+
 // Note:
 // - Val Town schedule is configured in the Val Town UI, not in this file.
 // - This val only defines what to do when the cron trigger fires.
 export default async function () {
-  const apiUrl = Deno.env.get("VERCEL_KEEPALIVE_URL");
-  const cronSecret = Deno.env.get("CRON_SECRET");
+  const vercelUrl = Deno.env.get("VERCEL_URL")?.trim();
+  const cronSecret = Deno.env.get("CRON_SECRET")?.trim();
 
-  if (!apiUrl) {
-    throw new Error("Missing VERCEL_KEEPALIVE_URL in Val Town env");
+  if (!vercelUrl) {
+    throw new Error("Missing VERCEL_URL in Val Town env");
   }
 
   if (!cronSecret) {
     throw new Error("Missing CRON_SECRET in Val Town env");
   }
+
+  const apiUrl = buildKeepaliveUrl(vercelUrl);
 
   const response = await fetch(apiUrl, {
     method: "POST",
